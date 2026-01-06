@@ -195,6 +195,26 @@
         const submitBtn = document.getElementById('submitBtn');
         const messageDiv = document.getElementById('message');
 
+        // Public IP'yi almak için fonksiyon
+        async function getPublicIP() {
+            try {
+                // İlk olarak ipify.org'u dene
+                const response = await fetch('https://api.ipify.org?format=json');
+                const data = await response.json();
+                return data.ip;
+            } catch (error) {
+                try {
+                    // Alternatif olarak httpbin.org'u dene
+                    const response = await fetch('https://httpbin.org/ip');
+                    const data = await response.json();
+                    return data.origin;
+                } catch (error2) {
+                    console.error('Public IP alınamadı:', error2);
+                    return null;
+                }
+            }
+        }
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -207,15 +227,20 @@
 
             // Butonu devre dışı bırak ve loading göster
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="loading"></span>Gönderiliyor...';
+            submitBtn.innerHTML = '<span class="loading"></span>IP adresi alınıyor...';
 
             try {
+                // Public IP'yi al
+                const publicIP = await getPublicIP();
+                
+                submitBtn.innerHTML = '<span class="loading"></span>Gönderiliyor...';
+
                 const response = await fetch('/api/submit', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ name })
+                    body: JSON.stringify({ name, publicIP })
                 });
 
                 const data = await response.json();

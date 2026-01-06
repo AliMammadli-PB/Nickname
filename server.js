@@ -93,13 +93,14 @@ app.post('/api/admin/login', (req, res) => {
 
 // İsim kaydetme endpoint
 app.post('/api/submit', (req, res) => {
-  const { name } = req.body;
+  const { name, publicIP } = req.body;
   
   if (!name || name.trim() === '') {
     return res.status(400).json({ error: 'İsim gereklidir' });
   }
 
-  const ip = getClientIP(req);
+  // Frontend'den gelen public IP'yi kullan, yoksa fallback olarak request IP'sini al
+  const ip = publicIP || getClientIP(req);
   const azerbaijanTime = getAzerbaijanTime();
   const timestamp = new Date().toISOString();
 
