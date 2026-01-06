@@ -1,31 +1,30 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const fs = require('fs');
 const path = require('path');
-const Database = require('better-sqlite3');
 
 const app = express();
-const PORT = 3000;
-const DB_PATH = path.join(__dirname, 'database.db');
+const PORT = process.env.PORT || 3000;
+// Vercel'de /tmp dizinine yazma izni var, local'de data.json kullan
+const DATA_FILE = process.env.VERCEL 
+  ? path.join('/tmp', 'data.json')
+  : path.join(__dirname, 'data.json');
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static('public'));
 
-// SQLite veritabanını başlat
-const db = new Database(DB_PATH);
+// Veritabanı dosyasını oluştur (yoksa)
+function initDatabase() {
+  if (!fs.existsSync(DATA_FILE)) {
+    fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2));
+  }
+}
 
-// Tabloyu oluştur (yoksa)
-db.exec(`
-  CREATE TABLE IF NOT EXISTS records (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    ip TEXT NOT NULL,
-    time TEXT NOT NULL,
-    timestamp TEXT NOT NULL
-  )
-`);
+// Veritabanını başlat
+initDatabase();
 
 // Azerbaycan saati (UTC+4)
 function getAzerbaijanTime() {
@@ -67,9 +66,27 @@ app.post('/api/submit', (req, res) => {
   const azerbaijanTime = getAzerbaijanTime();
   const timestamp = new Date().toISOString();
 
+  const newEntry = {
+    id: Date.now(),
+    name: name.trim(),
+    ip: ip,
+    time: azerbaijanTime,
+    timestamp: timestamp
+  };
+
   try {
-    const stmt = db.prepare('INSERT INTO records (name, ip, time, timestamp) VALUES (?, ?, ?, ?)');
-    stmt.run(name.trim(), ip, azerbaijanTime, timestamp);
+    // Mevcut verileri oku
+    let data = [];
+    if (fs.existsSync(DATA_FILE)) {
+      const fileContent = fs.readFileSync(DATA_FILE, 'utf8');
+      data = JSON.parse(fileContent);
+    }
+
+    // Yeni kaydı ekle
+    data.push(newEntry);
+
+    // Dosyaya yaz
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
     res.json({ success: true, message: 'Kayıt başarıyla eklendi' });
   } catch (error) {
     console.error('Veri yazma hatası:', error);
@@ -80,26 +97,29 @@ app.post('/api/submit', (req, res) => {
 // Tüm kayıtları getir (admin panel için)
 app.get('/api/records', (req, res) => {
   try {
-    const stmt = db.prepare('SELECT * FROM records ORDER BY id DESC');
-    const records = stmt.all();
+    if (!fs.existsSync(DATA_FILE)) {
+      return res.json([]);
+    }
+
+    const fileContent = fs.readFileSync(DATA_FILE, 'utf8');
+    const data = JSON.parse(fileContent);
     
-    // Veritabanı formatını API formatına çevir
-    const formattedRecords = records.map(record => ({
-      id: record.id,
-      name: record.name,
-      ip: record.ip,
-      time: record.time,
-      timestamp: record.timestamp
-    }));
+    // En yeni kayıtlar önce gelsin
+    const sortedData = data.sort((a, b) => b.id - a.id);
     
-    res.json(formattedRecords);
+    res.json(sortedData);
   } catch (error) {
     console.error('Veri okuma hatası:', error);
     res.json([]);
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server çalışıyor: http://localhost:${PORT}`);
-});
+// Vercel için export, local için listen
+if (process.env.VERCEL) {
+  module.exports = app;
+} else {
+  app.listen(PORT, () => {
+    console.log(`Server çalışıyor: http://localhost:${PORT}`);
+  });
+}
 

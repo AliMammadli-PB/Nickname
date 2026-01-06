@@ -1,6 +1,5 @@
 node_modules/
 data.json
-database.db
 .env
 *.log
 

@@ -35,5 +35,9 @@ npm start
 
 ## Veri Depolama
 
-Kayıtlar SQLite veritabanında (`database.db`) saklanır.
+Kayıtlar JSON dosyasında (`data.json`) saklanır. Vercel uyumlu olacak şekilde yapılandırılmıştır.
+
+## Vercel Deployment
+
+Proje Vercel'e deploy edilebilir. `vercel.json` dosyası yapılandırmayı içerir.
 
