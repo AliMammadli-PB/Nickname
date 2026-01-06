@@ -9,6 +9,7 @@ Kullanıcıların isimlerini kaydeden ve admin panelinde görüntüleyen basit b
 - 🌐 Otomatik IP adresi tespiti
 - 🕐 Azerbaycan saati (UTC+4) ile zaman kaydı
 - 📊 Admin paneli ile tüm kayıtları görüntüleme
+- 🔐 Admin panel şifre koruması
 - 🔄 Otomatik yenileme (admin panel)
 
 ## Kurulum
@@ -18,12 +19,24 @@ Kullanıcıların isimlerini kaydeden ve admin panelinde görüntüleyen basit b
 npm install
 ```
 
-2. Sunucuyu başlatın:
+2. `.env` dosyası oluşturun:
+```bash
+cp .env.example .env
+```
+
+3. `.env` dosyasını düzenleyin:
+```
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=canurek3
+PORT=3000
+```
+
+4. Sunucuyu başlatın:
 ```bash
 npm start
 ```
 
-3. Tarayıcınızda açın:
+5. Tarayıcınızda açın:
 - Ana sayfa: http://localhost:3000
 - Admin panel: http://localhost:3000/admin
 
@@ -31,7 +44,13 @@ npm start
 
 1. Ana sayfada kullanıcılar isimlerini yazarak gönderir
 2. Sistem otomatik olarak IP adresini ve Azerbaycan saatini kaydeder
-3. Admin panelinden tüm kayıtlar görüntülenebilir
+3. Admin panelinden tüm kayıtlar görüntülenebilir (şifre gereklidir)
+
+## Admin Panel
+
+Admin paneline erişmek için:
+- Kullanıcı adı: `.env` dosyasındaki `ADMIN_USERNAME` (varsayılan: `admin`)
+- Şifre: `.env` dosyasındaki `ADMIN_PASSWORD` (varsayılan: `canurek3`)
 
 ## Veri Depolama
 
@@ -40,4 +59,8 @@ Kayıtlar JSON dosyasında (`data.json`) saklanır. Vercel uyumlu olacak şekild
 ## Vercel Deployment
 
 Proje Vercel'e deploy edilebilir. `vercel.json` dosyası yapılandırmayı içerir.
+
+Vercel'de environment variables olarak şunları ekleyin:
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
 
