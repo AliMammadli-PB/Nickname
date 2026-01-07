@@ -40,6 +40,32 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Supabase bağlantısını test et
 async function testSupabaseConnection() {
+  console.log('\n========================================');
+  console.log('🔍 Supabase Bağlantı Kontrolü');
+  console.log('========================================');
+  
+  // Environment variables kontrolü
+  console.log(`📋 SUPABASE_URL: ${supabaseUrl ? '✓ AYARLI' : '✗ EKSİK'}`);
+  if (supabaseUrl) {
+    console.log(`   URL: ${supabaseUrl.substring(0, 30)}...`);
+  }
+  
+  console.log(`📋 ANON_PUBLIC: ${supabaseKey ? '✓ AYARLI' : '✗ EKSİK'}`);
+  if (supabaseKey) {
+    console.log(`   Key: ${supabaseKey.substring(0, 20)}...`);
+  }
+  
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('\n❌ HATA: Supabase environment variables eksik!');
+    console.error('   Render.com Dashboard → Environment Variables bölümünden ekleyin:');
+    console.error('   - SUPABASE_URL');
+    console.error('   - ANON_PUBLIC');
+    console.log('========================================\n');
+    return;
+  }
+  
+  // Bağlantı testi
+  console.log('\n🔄 Supabase bağlantısı test ediliyor...');
   try {
     const { data, error } = await supabase
       .from('ips')
@@ -47,16 +73,40 @@ async function testSupabaseConnection() {
       .limit(1);
     
     if (error) {
-      console.error('Supabase bağlantı hatası:', error.message);
-      console.error('Lütfen supabase-setup.sql dosyasındaki SQL kodunu Supabase SQL Editor\'da çalıştırın!');
+      console.error('\n❌ Supabase Bağlantı Hatası!');
+      console.error(`   Hata Mesajı: ${error.message}`);
+      console.error(`   Hata Kodu: ${error.code || 'N/A'}`);
+      console.error(`   Hata Detayı: ${error.details || 'N/A'}`);
+      console.error(`   Hata İpucu: ${error.hint || 'N/A'}`);
+      console.error('\n💡 Çözüm:');
+      console.error('   1. Supabase Dashboard → SQL Editor\'a gidin');
+      console.error('   2. supabase-setup.sql dosyasındaki SQL kodunu çalıştırın');
+      console.error('   3. Tablo adının "ips" (küçük harf) olduğundan emin olun');
+      console.error('   4. RLS (Row Level Security) politikalarını kontrol edin');
     } else {
-      console.log('✓ Supabase bağlantısı başarılı!');
+      console.log('\n✅ Supabase Bağlantısı Başarılı!');
+      console.log('   ✓ Tablo erişimi: OK');
+      console.log('   ✓ Veritabanı bağlantısı: OK');
+      
+      // Tablo bilgilerini al
+      const { count, error: countError } = await supabase
+        .from('ips')
+        .select('*', { count: 'exact', head: true });
+      
+      if (!countError) {
+        console.log(`   ✓ Toplam kayıt sayısı: ${count || 0}`);
+      }
     }
   } catch (error) {
-    console.error('Supabase test hatası:', error);
+    console.error('\n❌ Supabase Test Hatası!');
+    console.error(`   Hata: ${error.message}`);
+    console.error(`   Stack: ${error.stack}`);
   }
+  
+  console.log('========================================\n');
 }
 
+// Server başlatıldığında Supabase bağlantısını test et
 testSupabaseConnection();
 
 // Azerbaycan saati (UTC+4)
@@ -244,9 +294,12 @@ if (process.env.VERCEL) {
 } else {
   // Render.com veya local development
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server çalışıyor: http://localhost:${PORT}`);
-    console.log(`Supabase URL: ${supabaseUrl ? '✓ Ayarlı' : '✗ Eksik'}`);
-    console.log(`Supabase Key: ${supabaseKey ? '✓ Ayarlı' : '✗ Eksik'}`);
+    console.log('\n========================================');
+    console.log('🚀 Server Başlatıldı!');
+    console.log('========================================');
+    console.log(`📍 URL: http://localhost:${PORT}`);
+    console.log(`🌐 Public URL: https://nickname-64fw.onrender.com`);
+    console.log('========================================\n');
   });
 }
 
