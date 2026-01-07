@@ -421,19 +421,37 @@
             table.style.display = 'none';
 
             try {
+                console.log('loadRecords çağrıldı, token:', authToken ? 'Mevcut' : 'Eksik');
+                
                 const response = await fetch('/api/records', {
                     headers: {
                         'Authorization': `Bearer ${authToken}`
                     }
                 });
 
+                console.log('API yanıtı:', response.status, response.statusText);
+
                 if (response.status === 401) {
+                    console.log('401 hatası - Token geçersiz');
                     localStorage.removeItem('adminToken');
+                    authToken = null;
                     showLogin();
                     return;
                 }
 
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API hatası:', response.status, errorText);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
                 const records = await response.json();
+                console.log('Kayıtlar alındı:', records);
+
+                if (!Array.isArray(records)) {
+                    console.error('Beklenmeyen veri formatı:', typeof records, records);
+                    throw new Error('Beklenmeyen veri formatı');
+                }
 
                 loading.style.display = 'none';
                 totalCount.textContent = records.length;
@@ -457,8 +475,17 @@
 
                 table.style.display = 'table';
             } catch (error) {
-                console.error('Hata:', error);
-                loading.textContent = 'Veri yüklenirken hata oluştu!';
+                console.error('loadRecords hatası:', error);
+                console.error('Hata detayları:', error.message, error.stack);
+                loading.style.display = 'none';
+                loading.textContent = 'Veri yüklenirken hata oluştu: ' + error.message;
+                loading.style.color = '#d32f2f';
+                
+                // Hata mesajını 5 saniye sonra temizle
+                setTimeout(() => {
+                    loading.textContent = 'Yükleniyor...';
+                    loading.style.color = '#667eea';
+                }, 5000);
             }
         }
 
@@ -468,11 +495,40 @@
             return div.innerHTML;
         }
 
-        // Sayfa yüklendiğinde kayıtları yükle
-        loadRecords();
+        // Otomatik yenileme için interval
+        let refreshInterval = null;
 
-        // Her 5 saniyede bir otomatik yenile
-        setInterval(loadRecords, 5000);
+        function startAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+            refreshInterval = setInterval(() => {
+                if (authToken) {
+                    loadRecords();
+                }
+            }, 5000);
+        }
+
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+        }
+
+        // Admin panel gösterildiğinde otomatik yenilemeyi başlat
+        const originalShowAdminPanel = showAdminPanel;
+        showAdminPanel = function() {
+            originalShowAdminPanel();
+            startAutoRefresh();
+        };
+
+        // Login gösterildiğinde otomatik yenilemeyi durdur
+        const originalShowLogin = showLogin;
+        showLogin = function() {
+            originalShowLogin();
+            stopAutoRefresh();
+        };
     </script>
 </body>
 </html>

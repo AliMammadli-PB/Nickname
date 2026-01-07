@@ -20,9 +20,23 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(bodyParser.json());
-app.use(express.static('public'));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Request logging (development için)
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  next();
+});
+
+// Static dosyalar (public klasörü)
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Supabase bağlantısını test et
 async function testSupabaseConnection() {
@@ -68,6 +82,28 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Health check endpoint (Render.com için)
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    supabase: {
+      url: supabaseUrl ? 'configured' : 'missing',
+      key: supabaseKey ? 'configured' : 'missing'
+    }
+  });
+});
+
+// Test endpoint - API route'larının çalıştığını kontrol et
+app.get('/api/test', (req, res) => {
+  res.json({ 
+    message: 'API endpoint çalışıyor!',
+    timestamp: new Date().toISOString(),
+    method: req.method,
+    path: req.path
+  });
+});
+
 // Admin panel
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
@@ -78,12 +114,23 @@ const activeSessions = new Map();
 
 // Admin authentication middleware
 function requireAdminAuth(req, res, next) {
-  const token = req.headers.authorization?.replace('Bearer ', '');
+  const authHeader = req.headers.authorization;
+  console.log('[/api/records] Auth header:', authHeader ? 'Mevcut' : 'Eksik');
+  
+  if (!authHeader) {
+    console.log('[/api/records] Token bulunamadı');
+    return res.status(401).json({ error: 'Yetkisiz erişim - Token gerekli' });
+  }
+  
+  const token = authHeader.replace('Bearer ', '').trim();
+  console.log('[/api/records] Token kontrol ediliyor, aktif session sayısı:', activeSessions.size);
   
   if (token && activeSessions.has(token)) {
+    console.log('[/api/records] Token geçerli, erişim izni verildi');
     next();
   } else {
-    res.status(401).json({ error: 'Yetkisiz erişim' });
+    console.log('[/api/records] Token geçersiz veya session bulunamadı');
+    res.status(401).json({ error: 'Yetkisiz erişim - Geçersiz token' });
   }
 }
 
@@ -151,6 +198,8 @@ app.post('/api/submit', async (req, res) => {
 // Tüm kayıtları getir (admin panel için) - Korumalı
 app.get('/api/records', requireAdminAuth, async (req, res) => {
   try {
+    console.log('[/api/records] İstek alındı');
+    
     // Supabase'den kayıtları al
     const { data, error } = await supabase
       .from('ips')
@@ -158,12 +207,18 @@ app.get('/api/records', requireAdminAuth, async (req, res) => {
       .order('id', { ascending: false });
 
     if (error) {
-      console.error('Supabase okuma hatası:', error);
-      return res.status(500).json({ error: 'Veri okuma hatası: ' + error.message });
+      console.error('[/api/records] Supabase okuma hatası:', error);
+      console.error('[/api/records] Hata detayları:', JSON.stringify(error, null, 2));
+      return res.status(500).json({ 
+        error: 'Veri okuma hatası: ' + error.message,
+        details: error 
+      });
     }
     
+    console.log('[/api/records] Kayıt sayısı:', data ? data.length : 0);
+    
     // Supabase'den gelen verileri formatla
-    const formattedData = data.map(record => ({
+    const formattedData = (data || []).map(record => ({
       id: record.id,
       name: record.name,
       ip: record.ip,
@@ -171,19 +226,27 @@ app.get('/api/records', requireAdminAuth, async (req, res) => {
       timestamp: record.timestamp
     }));
     
-    res.json(formattedData || []);
+    res.json(formattedData);
   } catch (error) {
-    console.error('Veri okuma hatası:', error);
-    res.status(500).json({ error: 'Veri okuma hatası' });
+    console.error('[/api/records] Genel hata:', error);
+    console.error('[/api/records] Hata stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Veri okuma hatası',
+      message: error.message 
+    });
   }
 });
 
-// Vercel için export, local için listen
+// Render.com ve Vercel için export, local için listen
+// Render.com PORT environment variable'ını otomatik set eder
 if (process.env.VERCEL) {
   module.exports = app;
 } else {
-  app.listen(PORT, () => {
+  // Render.com veya local development
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server çalışıyor: http://localhost:${PORT}`);
+    console.log(`Supabase URL: ${supabaseUrl ? '✓ Ayarlı' : '✗ Eksik'}`);
+    console.log(`Supabase Key: ${supabaseKey ? '✓ Ayarlı' : '✗ Eksik'}`);
   });
 }
 
